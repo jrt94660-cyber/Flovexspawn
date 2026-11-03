@@ -1,0 +1,44 @@
+name: FlovexSpawn
+version: '${version}'
+main: com.flovex.spawn.FlovexSpawn
+api-version: '1.21'
+author: FlovexSMP
+description: Numbered spawn and AFK teleport locations with an Action Bar countdown.
+commands:
+  setspawn:
+    description: Set a numbered spawn location.
+    usage: /setspawn <number>
+    permission: flovexspawn.setspawn
+  setafk:
+    description: Set a numbered AFK location.
+    usage: /setafk <number>
+    permission: flovexspawn.setafk
+  spawn:
+    description: Teleport to the default spawn location.
+    usage: /spawn
+    permission: flovexspawn.spawn
+  afk:
+    description: Teleport to the default AFK location.
+    usage: /afk
+    permission: flovexspawn.afk
+permissions:
+  flovexspawn.setspawn:
+    description: Allows setting numbered spawn locations.
+    default: op
+  flovexspawn.setafk:
+    description: Allows setting numbered AFK locations.
+    default: op
+  flovexspawn.spawn:
+    description: Allows using /spawn.
+    default: true
+  flovexspawn.afk:
+    description: Allows using /afk.
+    default: true
+  flovexspawn.admin:
+    description: Grants all FlovexSpawn permissions.
+    default: op
+    children:
+      flovexspawn.setspawn: true
+      flovexspawn.setafk: true
+      flovexspawn.spawn: true
+      flovexspawn.afk: true
