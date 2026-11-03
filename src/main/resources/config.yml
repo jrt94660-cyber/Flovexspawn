@@ -1,0 +1,23 @@
+# Teleport countdown duration in seconds.
+countdown-seconds: 5
+
+# Cancel the countdown when the player changes position.
+cancel-on-move: true
+
+messages:
+  prefix: '&8[&#38BDFB&lFlovexSpawn&8] '
+  no-permission: '&cYou do not have permission to do that.'
+  players-only: '&cOnly players can use this command.'
+  invalid-number: '&cPlease provide a valid positive number.'
+  usage-setspawn: '&cUsage: /setspawn <number>'
+  usage-setafk: '&cUsage: /setafk <number>'
+  location-set: '&aSaved %type% location &f#%number%&a.'
+  location-missing: '&cThe default %type% location has not been set yet.'
+  teleport-start: '&7Teleporting to %type% in &f%seconds%&7 seconds. Do not move.'
+  teleport-success: '&aTeleported to %type%!'
+  teleport-cancelled: '&cTeleport cancelled because you moved.'
+  teleport-disconnected: '&cTeleport cancelled.'
+
+actionbar:
+  countdown: '&#38BDFB&lTELEPORTING &8» &f%type% &8| &#38BDFB%seconds%s'
+  cancelled: '&cTeleport cancelled'
