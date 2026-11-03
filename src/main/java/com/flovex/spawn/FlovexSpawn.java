@@ -20,8 +20,11 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public final class FlovexSpawn extends JavaPlugin implements Listener {
+    private static final Pattern HEX_PATTERN = Pattern.compile("&#([A-Fa-f0-9]{6})");
     private final Map<UUID, TeleportTask> pendingTeleports = new HashMap<>();
     private File locationsFile;
     private YamlConfiguration locations;
@@ -61,6 +64,7 @@ public final class FlovexSpawn extends JavaPlugin implements Listener {
                 send(player, name.equals("setspawn") ? "usage-setspawn" : "usage-setafk");
                 return true;
             }
+
             int number;
             try {
                 number = Integer.parseInt(args[0]);
@@ -69,7 +73,9 @@ public final class FlovexSpawn extends JavaPlugin implements Listener {
                 send(player, "invalid-number");
                 return true;
             }
-            String path = (name.equals("setspawn") ? "spawn." : "afk.") + number;
+
+            String type = name.equals("setspawn") ? "spawn" : "afk";
+            String path = type + "." + number;
             Location location = player.getLocation();
             locations.set(path + ".world", location.getWorld().getName());
             locations.set(path + ".x", location.getX());
@@ -78,7 +84,7 @@ public final class FlovexSpawn extends JavaPlugin implements Listener {
             locations.set(path + ".yaw", location.getYaw());
             locations.set(path + ".pitch", location.getPitch());
             saveLocations();
-            send(player, "location-set", "%type%", name.equals("setspawn") ? "spawn" : "AFK", "%number%", String.valueOf(number));
+            send(player, "location-set", "%type%", type, "%number%", String.valueOf(number));
             return true;
         }
 
@@ -116,31 +122,32 @@ public final class FlovexSpawn extends JavaPlugin implements Listener {
     private void startTeleport(Player player, Location destination, String type) {
         cancelTeleport(player, false);
         int seconds = Math.max(1, getConfig().getInt("countdown-seconds", 5));
-        Location start = player.getLocation().clone();
-        TeleportTask task = new TeleportTask(player, destination, start, type, seconds);
+        TeleportTask task = new TeleportTask(player, destination, player.getLocation().clone(), type, seconds);
         pendingTeleports.put(player.getUniqueId(), task);
         task.runTaskTimer(this, 0L, 20L);
     }
 
     private void cancelTeleport(Player player, boolean notify) {
         TeleportTask task = pendingTeleports.remove(player.getUniqueId());
-        if (task != null) {
-            task.cancel();
-            if (notify) {
-                send(player, "teleport-cancelled");
-                player.sendActionBar(color(getConfig().getString("actionbar.cancelled", "&cTeleport cancelled")));
-            }
+        if (task == null) return;
+        task.cancel();
+        if (notify) {
+            send(player, "teleport-cancelled");
+            player.sendActionBar(color(getConfig().getString("actionbar.cancelled", "&cTeleport cancelled")));
         }
     }
 
     @EventHandler
     public void onMove(PlayerMoveEvent event) {
-        if (!getConfig().getBoolean("cancel-on-move", true)) return;
-        if (event.getTo() == null) return;
-        if (event.getFrom().getBlockX() == event.getTo().getBlockX()
-                && event.getFrom().getBlockY() == event.getTo().getBlockY()
-                && event.getFrom().getBlockZ() == event.getTo().getBlockZ()) return;
-        if (pendingTeleports.containsKey(event.getPlayer().getUniqueId())) cancelTeleport(event.getPlayer(), true);
+        if (!getConfig().getBoolean("cancel-on-move", true) || event.getTo() == null) return;
+        TeleportTask task = pendingTeleports.get(event.getPlayer().getUniqueId());
+        if (task == null) return;
+
+        Location from = task.start;
+        Location to = event.getTo();
+        if (from.getWorld() != to.getWorld() || from.distanceSquared(to) > 1.0E-4) {
+            cancelTeleport(event.getPlayer(), true);
+        }
     }
 
     @EventHandler
@@ -158,13 +165,23 @@ public final class FlovexSpawn extends JavaPlugin implements Listener {
 
     private void send(CommandSender sender, String key, String... replacements) {
         String message = getConfig().getString("messages." + key, "&cMissing message: " + key);
-        for (int i = 0; i + 1 < replacements.length; i += 2) message = message.replace(replacements[i], replacements[i + 1]);
-        String prefix = getConfig().getString("messages.prefix", "");
-        sender.sendMessage(color(prefix + message));
+        for (int i = 0; i + 1 < replacements.length; i += 2) {
+            message = message.replace(replacements[i], replacements[i + 1]);
+        }
+        sender.sendMessage(color(getConfig().getString("messages.prefix", "") + message));
     }
 
     private String color(String input) {
-        return ChatColor.translateAlternateColorCodes('&', input.replaceAll("&#([A-Fa-f0-9]{6})", "§x§$1".replace("$1", "$1")));
+        Matcher matcher = HEX_PATTERN.matcher(input);
+        StringBuffer converted = new StringBuffer();
+        while (matcher.find()) {
+            String hex = matcher.group(1);
+            StringBuilder replacement = new StringBuilder("§x");
+            for (char character : hex.toCharArray()) replacement.append('§').append(character);
+            matcher.appendReplacement(converted, Matcher.quoteReplacement(replacement.toString()));
+        }
+        matcher.appendTail(converted);
+        return ChatColor.translateAlternateColorCodes('&', converted.toString());
     }
 
     private final class TeleportTask extends BukkitRunnable {
@@ -191,11 +208,12 @@ public final class FlovexSpawn extends JavaPlugin implements Listener {
             }
             if (remaining <= 0) {
                 pendingTeleports.remove(player.getUniqueId());
-                player.teleportAsync(destination);
-                send(player, "teleport-success", "%type%", type);
+                boolean teleported = player.teleport(destination);
+                if (teleported) send(player, "teleport-success", "%type%", type);
                 cancel();
                 return;
             }
+
             String bar = getConfig().getString("actionbar.countdown", "&bTeleporting in %seconds%s");
             bar = bar.replace("%seconds%", String.valueOf(remaining)).replace("%type%", type);
             player.sendActionBar(color(bar));
